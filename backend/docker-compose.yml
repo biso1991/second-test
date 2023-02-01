@@ -1,0 +1,116 @@
+version: '3'
+services:
+  postgres:
+    image: postgres:11.6
+    environment:
+      POSTGRES_USER: dbuser
+      POSTGRES_PASSWORD: dbpassword
+      POSTGRES_DB: qadb
+  web:
+    restart: always
+    environment:
+      - DJANGO_SECRET_KEY=rthrtht63=2g*8^6o-u(0w#=x0g1_ejoer))29gzm@18#t@whfdsefefserhgserh
+    build: ./
+    command: >
+      bash -c "pip install farm-haystack[ocr]==1.4.0 &&
+                python wait_for_postgres.py &&
+                ./manage.py makemigrations &&
+               ./manage.py migrate &&
+               ./manage.py runserver 0.0.0.0:8000 &
+               celery -A api worker --loglevel=info -E -P threads"
+    volumes:
+      - ./:/code
+    ports:
+      - '8000:8000'
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+
+  # worker:
+  #   build:
+  #     context: .
+  #   image: celery
+  #   command:
+  #     ['celery', '-A', 'api', 'worker', '-l', 'info', '-E', '-P', 'threads']
+  #   environment:
+  #     - BROKER_URL=redis://redis:6379/0
+  #     - RESULT_BACKEND=redis://redis:6379/0
+  #     - C_FORCE_ROOT=true
+  #   # volumes:
+  #   #   - ./:/app/
+  #   depends_on:
+  #     - redis
+  #   restart: always
+
+  # celery -A api worker --loglevel=info -E -P threads &
+  # documentation:
+  #   restart: always
+  #   build: ./
+  #   command: 'mkdocs serve'
+  #   volumes:
+  #     - ./:/code
+  #   ports:
+  #     - '8001:8001'
+  pgadmin:
+    depends_on:
+      - postgres
+    image: dpage/pgadmin4
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: dbuser@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: 1991
+    ports:
+      - 5050:80
+  mailhog:
+    image: mailhog/mailhog
+    logging:
+      driver: 'none' # disable saving logs
+    ports:
+      - 1025:1025 # smtp server
+      - 8025:8025 # web ui
+  elasticsearch:
+    depends_on:
+      - postgres
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.1
+    environment:
+      - node.name=demo-elasticsearch_1
+      - cluster.name=elasticsearch-docker-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - 'ES_JAVA_OPTS=-Xms512m -Xmx512m'
+      - xpack.security.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+  redis:
+    image: redis:6.2-alpine
+    restart: always
+    ports:
+      - '6379:6379'
+    command: redis-server --save 20 1 --loglevel warning
+    volumes:
+      - cache-redis:/data
+  # flower:
+  #   image: mher/flower
+  #   environment:
+  #     - CELERY_BROKER_URL=redis://redis:6379/0
+  #     - FLOWER_PORT=8888
+  #   ports:
+  #     - 5555:8888
+  #   depends_on:
+  #     - redis
+  #   restart: always
+volumes:
+  elasticsearch-data:
+    driver: local
+  cache-redis:
+    driver: local
+# --requirepass eYVX7EwVmmxKPCDmwMtyKVge8oLd2t81
