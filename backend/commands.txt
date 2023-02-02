@@ -1,0 +1,8 @@
+username: root
+Email address: root@gmail.com
+Password: 1991
+
+docker-compose up
+docker-compose run --rm web ./manage.py makemigrations 
+docker-compose run --rm web ./manage.py migration
+docker-compose run --rm web ./manage.py createsuperuser
